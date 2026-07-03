@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "foible",
-    "foible-macros",
+    "foible-derive",
 ]
 resolver = "2"
 

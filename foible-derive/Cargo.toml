@@ -1,8 +1,9 @@
 [package]
-name = "foible-macros"
+name = "foible-derive"
 version.workspace = true
 edition.workspace = true
 description = "Proc-macro internals for the foible crate — do not use directly"
+keywords = ["derive", "macro", "proc-macro", "error-handling"]
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true

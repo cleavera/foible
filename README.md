@@ -57,7 +57,7 @@ needed, for example:
 ## Crates
 
 - [`foible`](./foible) — the public `AsSource` trait and derive macro re-export.
-- [`foible-macros`](./foible-macros) — proc-macro internals for `foible`. Not
+- [`foible-derive`](./foible-derive) — proc-macro internals for `foible`. Not
   intended to be used directly.
 
 ## License
