@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "foible",
+    "foible-macros",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/cleavera/foible"
+homepage = "https://github.com/cleavera/foible"

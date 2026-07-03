@@ -1,0 +1,11 @@
+[package]
+name = "foible"
+version.workspace = true
+edition.workspace = true
+description = "Lightweight typed error chaining — #[derive(AsSource)] with no Display or std::error::Error boilerplate"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+foible-macros = { path = "../foible-macros", version = "0.1.0" }

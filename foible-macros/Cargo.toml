@@ -1,0 +1,15 @@
+[package]
+name = "foible-macros"
+version.workspace = true
+edition.workspace = true
+description = "Proc-macro internals for the foible crate — do not use directly"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0"
