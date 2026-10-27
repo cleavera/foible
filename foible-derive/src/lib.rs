@@ -1,15 +1,37 @@
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{parse_macro_input, Attribute, Data, DeriveInput, Error, Fields};
 
 #[proc_macro_derive(Trace, attributes(from))]
 pub fn derive_trace(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+    expand(input)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+fn from_attr(attrs: &[Attribute]) -> Option<&Attribute> {
+    attrs.iter().find(|attr| attr.path().is_ident("from"))
+}
+
+fn expand(input: DeriveInput) -> syn::Result<TokenStream2> {
     let name = &input.ident;
 
     let variants = match input.data {
         Data::Enum(data) => data.variants,
-        _ => panic!("Trace can only be derived on Enums"),
+        Data::Struct(data) => {
+            return Err(Error::new_spanned(
+                data.struct_token,
+                "Trace can only be derived on enums",
+            ))
+        }
+        Data::Union(data) => {
+            return Err(Error::new_spanned(
+                data.union_token,
+                "Trace can only be derived on enums",
+            ))
+        }
     };
 
     let mut match_arms = Vec::new();
@@ -31,11 +53,7 @@ pub fn derive_trace(input: TokenStream) -> TokenStream {
                     }
                 });
 
-                let has_from = variant
-                    .attrs
-                    .iter()
-                    .any(|attr| attr.path().is_ident("from"));
-                if has_from {
+                if from_attr(&variant.attrs).is_some() {
                     from_impls.push(quote! {
                         impl ::core::convert::From<#inner_type> for #name {
                             fn from(err: #inner_type) -> Self {
@@ -46,6 +64,13 @@ pub fn derive_trace(input: TokenStream) -> TokenStream {
                 }
                 continue;
             }
+        }
+
+        if let Some(attr) = from_attr(&variant.attrs) {
+            return Err(Error::new_spanned(
+                attr,
+                "#[from] can only be used on a variant with exactly one unnamed field",
+            ));
         }
 
         if let Fields::Unit = &variant.fields {
@@ -74,5 +99,5 @@ pub fn derive_trace(input: TokenStream) -> TokenStream {
         #(#from_impls)*
     };
 
-    TokenStream::from(expanded)
+    Ok(expanded)
 }
