@@ -24,38 +24,125 @@ pub use foible_derive::Trace;
 
 /// Used by the derive macro. Not part of the public API.
 ///
-/// Autoref specialization: method lookup tries `Trace`, then `Display`,
-/// then `Debug`, so the first one the concrete type implements wins.
+/// Autoref specialization: for every field, method lookup tries `Trace`, then
+/// `Display`, then `Debug`, so the first one the concrete type implements wins.
+/// A `Trace` field is the variant's cause and is written on the following
+/// line; any other field is data and is written inline.
 #[doc(hidden)]
 pub mod __private {
     use super::*;
 
     pub struct Wrap<'a, T: ?Sized>(pub &'a T);
 
+    /// Writes the inline `(a; name: b)` list, opening the parenthesis lazily so
+    /// variants without data fields print no parentheses.
+    #[derive(Default)]
+    pub struct DataSep {
+        opened: bool,
+    }
+
+    impl DataSep {
+        pub fn begin(&mut self, f: &mut fmt::Formatter<'_>, name: Option<&str>) -> fmt::Result {
+            f.write_str(if self.opened { "; " } else { "(" })?;
+            self.opened = true;
+            match name {
+                Some(name) => write!(f, "{name}: "),
+                None => Ok(()),
+            }
+        }
+
+        pub fn finish(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            if self.opened {
+                f.write_str(")")
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    // Typestate that turns a second `Trace` field in one variant into a type
+    // error: only the first can consume the `CauseSlot`.
+    pub struct CauseSlot;
+    pub struct CauseAlreadyTaken;
+
     pub trait ViaTrace {
-        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+        fn write_data(
+            &self,
+            f: &mut fmt::Formatter<'_>,
+            sep: &mut DataSep,
+            name: Option<&str>,
+        ) -> fmt::Result;
+        fn write_child(
+            &self,
+            f: &mut fmt::Formatter<'_>,
+            slot: CauseSlot,
+        ) -> Result<CauseAlreadyTaken, fmt::Error>;
     }
     impl<T: Trace + ?Sized> ViaTrace for &&Wrap<'_, T> {
-        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            self.0.write_trace(f)
+        fn write_data(
+            &self,
+            _: &mut fmt::Formatter<'_>,
+            _: &mut DataSep,
+            _: Option<&str>,
+        ) -> fmt::Result {
+            Ok(())
+        }
+        fn write_child(
+            &self,
+            f: &mut fmt::Formatter<'_>,
+            _: CauseSlot,
+        ) -> Result<CauseAlreadyTaken, fmt::Error> {
+            f.write_str("\n  ")?;
+            self.0.write_trace(f)?;
+            Ok(CauseAlreadyTaken)
         }
     }
 
     pub trait ViaDisplay {
-        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+        fn write_data(
+            &self,
+            f: &mut fmt::Formatter<'_>,
+            sep: &mut DataSep,
+            name: Option<&str>,
+        ) -> fmt::Result;
+        fn write_child<S>(&self, f: &mut fmt::Formatter<'_>, slot: S) -> Result<S, fmt::Error>;
     }
     impl<T: Display + ?Sized> ViaDisplay for &Wrap<'_, T> {
-        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn write_data(
+            &self,
+            f: &mut fmt::Formatter<'_>,
+            sep: &mut DataSep,
+            name: Option<&str>,
+        ) -> fmt::Result {
+            sep.begin(f, name)?;
             Display::fmt(self.0, f)
+        }
+        fn write_child<S>(&self, _: &mut fmt::Formatter<'_>, slot: S) -> Result<S, fmt::Error> {
+            Ok(slot)
         }
     }
 
     pub trait ViaDebug {
-        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+        fn write_data(
+            &self,
+            f: &mut fmt::Formatter<'_>,
+            sep: &mut DataSep,
+            name: Option<&str>,
+        ) -> fmt::Result;
+        fn write_child<S>(&self, f: &mut fmt::Formatter<'_>, slot: S) -> Result<S, fmt::Error>;
     }
     impl<T: Debug + ?Sized> ViaDebug for Wrap<'_, T> {
-        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn write_data(
+            &self,
+            f: &mut fmt::Formatter<'_>,
+            sep: &mut DataSep,
+            name: Option<&str>,
+        ) -> fmt::Result {
+            sep.begin(f, name)?;
             Debug::fmt(self.0, f)
+        }
+        fn write_child<S>(&self, _: &mut fmt::Formatter<'_>, slot: S) -> Result<S, fmt::Error> {
+            Ok(slot)
         }
     }
 }

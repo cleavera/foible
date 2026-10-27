@@ -20,14 +20,14 @@ struct NoDisplay;
 
 #[test]
 fn chain_through_trace_and_display() {
-    let e: Outer = Inner::from(std::io::Error::new(std::io::ErrorKind::Other, "disk")).into();
-    assert_eq!(e.trace(), "Outer::Inner\n  Inner::Io\n  disk");
+    let e: Outer = Inner::from(std::io::Error::other("disk")).into();
+    assert_eq!(e.trace(), "Outer::Inner\n  Inner::Io(disk)");
 }
 
 #[test]
 fn leaf_and_debug_fallback() {
     assert_eq!(Outer::Gone.trace(), "Outer::Gone");
-    assert_eq!(Outer::Msg(NoDisplay).trace(), "Outer::Msg\n  NoDisplay");
+    assert_eq!(Outer::Msg(NoDisplay).trace(), "Outer::Msg(NoDisplay)");
     assert_eq!(
         Outer::from(Inner::Missing).trace(),
         "Outer::Inner\n  Inner::Missing"
@@ -106,7 +106,7 @@ mod generics {
 
     #[test]
     fn generic_params() {
-        assert_eq!(Retry::Exhausted(3).trace(), "Retry::Exhausted\n  3");
+        assert_eq!(Retry::Exhausted(3).trace(), "Retry::Exhausted(3)");
         assert_eq!(Retry::<u8>::Cancelled.trace(), "Retry::Cancelled");
         assert_eq!(
             Chained::Failed(Leaf::Gone).trace(),
@@ -117,7 +117,76 @@ mod generics {
     #[test]
     fn lifetimes_consts_and_from() {
         let e: Where<'_, u8, 2> = vec![1u8].into();
-        assert_eq!(e.trace(), "Where::Many\n  [1]");
-        assert_eq!(Where::<u8, 2>::Arr([1, 2]).trace(), "Where::Arr\n  [1, 2]");
+        assert_eq!(e.trace(), "Where::Many([1])");
+        assert_eq!(Where::<u8, 2>::Arr([1, 2]).trace(), "Where::Arr([1, 2])");
+    }
+}
+
+mod fields {
+    use foible::Trace;
+
+    #[derive(Debug, Trace)]
+    enum Baz {
+        C,
+    }
+
+    #[derive(Debug, Trace)]
+    enum Bar {
+        Plain(u8, &'static str),
+        Named { id: u8, name: &'static str },
+        Wraps(Baz),
+        Empty(),
+        EmptyNamed {},
+    }
+
+    #[derive(Debug, Trace)]
+    enum Foo {
+        DataThenCause(Bar, &'static str),
+        CauseThenData(&'static str, Bar),
+        NamedCause {
+            err: Bar,
+            id: u8,
+        },
+        #[from]
+        NamedSingle {
+            err: Baz,
+        },
+    }
+
+    #[test]
+    fn data_fields_inline() {
+        assert_eq!(Bar::Plain(0, "Baz").trace(), "Bar::Plain(0; Baz)");
+        assert_eq!(
+            Bar::Named { id: 0, name: "Baz" }.trace(),
+            "Bar::Named(id: 0; name: Baz)"
+        );
+        assert_eq!(Bar::Empty().trace(), "Bar::Empty");
+        assert_eq!(Bar::EmptyNamed {}.trace(), "Bar::EmptyNamed");
+    }
+
+    #[test]
+    fn cause_on_following_line() {
+        let cause = || Bar::Wraps(Baz::C);
+        assert_eq!(
+            Foo::DataThenCause(cause(), "x").trace(),
+            "Foo::DataThenCause(x)\n  Bar::Wraps\n  Baz::C"
+        );
+        assert_eq!(
+            Foo::CauseThenData("x", cause()).trace(),
+            "Foo::CauseThenData(x)\n  Bar::Wraps\n  Baz::C"
+        );
+        assert_eq!(
+            Foo::NamedCause {
+                err: cause(),
+                id: 7
+            }
+            .trace(),
+            "Foo::NamedCause(id: 7)\n  Bar::Wraps\n  Baz::C"
+        );
+    }
+
+    #[test]
+    fn from_on_named_single_field() {
+        assert_eq!(Foo::from(Baz::C).trace(), "Foo::NamedSingle\n  Baz::C");
     }
 }

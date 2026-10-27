@@ -1,7 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, Error, Fields, Generics, Type};
+use quote::{format_ident, quote, quote_spanned};
+use syn::{
+    parse_macro_input, spanned::Spanned, Attribute, Data, DeriveInput, Error, Fields, Generics,
+    Type,
+};
 
 #[proc_macro_derive(Trace, attributes(from))]
 pub fn derive_trace(input: TokenStream) -> TokenStream {
@@ -64,62 +67,87 @@ fn expand(input: DeriveInput) -> syn::Result<TokenStream2> {
 
     for variant in variants.iter() {
         let variant_ident = &variant.ident;
+        let label = format!("{}::{}", name, variant_ident);
 
-        if let Fields::Unnamed(fields) = &variant.fields {
-            if fields.unnamed.len() == 1 {
-                let inner_type = &fields.unnamed[0].ty;
-
-                let label = format!("{}::{}", name, variant_ident);
-                match_arms.push(quote! {
-                    Self::#variant_ident(inner) => {
-                        f.write_str(#label)?;
-                        f.write_str("\n  ")?;
-                        (&&&::foible::__private::Wrap(inner)).write_chain(f)
-                    }
-                });
-
-                if let Some(attr) = from_attr(&variant.attrs) {
-                    // Would overlap with core's `impl<T> From<T> for T`.
-                    if is_bare_type_param(inner_type, &input.generics) {
-                        return Err(Error::new_spanned(
-                            attr,
-                            "#[from] cannot be used on a field whose type is a bare generic parameter",
-                        ));
-                    }
-                    from_impls.push(quote! {
-                        impl #impl_generics ::core::convert::From<#inner_type> for #name #ty_generics #where_clause {
-                            fn from(err: #inner_type) -> Self {
-                                Self::#variant_ident(err)
-                            }
-                        }
-                    });
-                }
-                continue;
-            }
-        }
+        let fields: Vec<_> = variant.fields.iter().collect();
+        let bindings: Vec<_> = (0..fields.len())
+            .map(|i| format_ident!("__foible_{}", i))
+            .collect();
 
         if let Some(attr) = from_attr(&variant.attrs) {
-            return Err(Error::new_spanned(
-                attr,
-                "#[from] can only be used on a variant with exactly one unnamed field",
-            ));
+            let [field] = fields.as_slice() else {
+                return Err(Error::new_spanned(
+                    attr,
+                    "#[from] can only be used on a variant with exactly one field",
+                ));
+            };
+            let inner_type = &field.ty;
+            // Would overlap with core's `impl<T> From<T> for T`.
+            if is_bare_type_param(inner_type, &input.generics) {
+                return Err(Error::new_spanned(
+                    attr,
+                    "#[from] cannot be used on a field whose type is a bare generic parameter",
+                ));
+            }
+            let construct = match &field.ident {
+                Some(field_name) => quote!(Self::#variant_ident { #field_name: err }),
+                None => quote!(Self::#variant_ident(err)),
+            };
+            from_impls.push(quote! {
+                impl #impl_generics ::core::convert::From<#inner_type> for #name #ty_generics #where_clause {
+                    fn from(err: #inner_type) -> Self {
+                        #construct
+                    }
+                }
+            });
         }
 
-        if let Fields::Unit = &variant.fields {
-            let label = format!("{}::{}", name, variant_ident);
-            match_arms.push(quote! {
-                Self::#variant_ident => f.write_str(#label),
-            });
-        } else {
-            let label = format!("{}::{}", name, variant_ident);
-            match_arms.push(quote! {
-                Self::#variant_ident { .. } => f.write_str(#label),
-            });
-        }
+        let pattern = match &variant.fields {
+            Fields::Unit => quote!(Self::#variant_ident),
+            Fields::Unnamed(_) => quote!(Self::#variant_ident(#(#bindings),*)),
+            Fields::Named(_) => {
+                let names = fields.iter().map(|field| &field.ident);
+                quote!(Self::#variant_ident { #(#names: #bindings),* })
+            }
+        };
+
+        let write_data = fields.iter().zip(&bindings).map(|(field, binding)| {
+            let field_name = match &field.ident {
+                Some(ident) => {
+                    let ident = ident.to_string();
+                    quote!(::core::option::Option::Some(#ident))
+                }
+                None => quote!(::core::option::Option::None),
+            };
+            quote! {
+                (&&&::foible::__private::Wrap(#binding)).write_data(f, &mut sep, #field_name)?;
+            }
+        });
+
+        // Spanned on the field so a second `Trace` field is reported there.
+        let write_child = fields.iter().zip(&bindings).map(|(field, binding)| {
+            quote_spanned! {field.span()=>
+                let slot = (&&&::foible::__private::Wrap(#binding)).write_child(f, slot)?;
+            }
+        });
+
+        match_arms.push(quote! {
+            #pattern => {
+                f.write_str(#label)?;
+                let mut sep = ::foible::__private::DataSep::default();
+                #(#write_data)*
+                sep.finish(f)?;
+                let slot = ::foible::__private::CauseSlot;
+                #(#write_child)*
+                let _ = slot;
+                ::core::result::Result::Ok(())
+            }
+        });
     }
 
     let expanded = quote! {
         impl #trace_impl_generics ::foible::Trace for #name #ty_generics #trace_where_clause {
+            #[allow(clippy::needless_borrow, clippy::borrow_deref_ref)]
             fn write_trace(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 use ::foible::__private::{ViaTrace as _, ViaDebug as _, ViaDisplay as _};
                 match self {
