@@ -1,23 +1,22 @@
-use std::fmt::{Debug, Display};
+use std::fmt::{self, Debug, Display};
 
 /// A typed error that can render its chain of wrapped errors as a stack-trace
 /// style listing, one link per line, outermost first.
 pub trait Trace: Debug {
-    /// Appends one line per link in the chain, outermost first.
-    fn write_trace(&self, out: &mut Vec<String>);
+    /// Writes this link, then (indented on a new line) the trace of the error
+    /// it wraps, if any.
+    fn write_trace(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
     /// Renders the chain as a multi-line trace. Every line after the first is
     /// indented, like the frames of a stack trace.
     fn trace(&self) -> String {
-        let mut lines = Vec::new();
-        self.write_trace(&mut lines);
-        let mut iter = lines.into_iter();
-        let mut out = iter.next().unwrap_or_default();
-        for line in iter {
-            out.push_str("\n  ");
-            out.push_str(&line);
+        struct Adapter<'a, T: ?Sized>(&'a T);
+        impl<T: Trace + ?Sized> Display for Adapter<'_, T> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.0.write_trace(f)
+            }
         }
-        out
+        Adapter(self).to_string()
     }
 }
 
@@ -34,29 +33,29 @@ pub mod __private {
     pub struct Wrap<'a, T: ?Sized>(pub &'a T);
 
     pub trait ViaTrace {
-        fn write_chain(&self, out: &mut Vec<String>);
+        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
     }
     impl<T: Trace + ?Sized> ViaTrace for &&Wrap<'_, T> {
-        fn write_chain(&self, out: &mut Vec<String>) {
-            self.0.write_trace(out);
+        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            self.0.write_trace(f)
         }
     }
 
     pub trait ViaDisplay {
-        fn write_chain(&self, out: &mut Vec<String>);
+        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
     }
     impl<T: Display + ?Sized> ViaDisplay for &Wrap<'_, T> {
-        fn write_chain(&self, out: &mut Vec<String>) {
-            out.push(self.0.to_string());
+        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            Display::fmt(self.0, f)
         }
     }
 
     pub trait ViaDebug {
-        fn write_chain(&self, out: &mut Vec<String>);
+        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
     }
     impl<T: Debug + ?Sized> ViaDebug for Wrap<'_, T> {
-        fn write_chain(&self, out: &mut Vec<String>) {
-            out.push(format!("{:?}", self.0));
+        fn write_chain(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            Debug::fmt(self.0, f)
         }
     }
 }

@@ -25,8 +25,9 @@ pub fn derive_trace(input: TokenStream) -> TokenStream {
                 let label = format!("{}::{}", name, variant_ident);
                 match_arms.push(quote! {
                     Self::#variant_ident(inner) => {
-                        out.push(#label.to_string());
-                        (&&&foible::__private::Wrap(inner)).write_chain(out);
+                        f.write_str(#label)?;
+                        f.write_str("\n  ")?;
+                        (&&&::foible::__private::Wrap(inner)).write_chain(f)
                     }
                 });
 
@@ -50,20 +51,20 @@ pub fn derive_trace(input: TokenStream) -> TokenStream {
         if let Fields::Unit = &variant.fields {
             let label = format!("{}::{}", name, variant_ident);
             match_arms.push(quote! {
-                Self::#variant_ident => out.push(#label.to_string()),
+                Self::#variant_ident => f.write_str(#label),
             });
         } else {
             let label = format!("{}::{}", name, variant_ident);
             match_arms.push(quote! {
-                Self::#variant_ident { .. } => out.push(#label.to_string()),
+                Self::#variant_ident { .. } => f.write_str(#label),
             });
         }
     }
 
     let expanded = quote! {
-        impl foible::Trace for #name {
-            fn write_trace(&self, out: &mut Vec<String>) {
-                use foible::__private::{ViaTrace as _, ViaDebug as _, ViaDisplay as _};
+        impl ::foible::Trace for #name {
+            fn write_trace(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                use ::foible::__private::{ViaTrace as _, ViaDebug as _, ViaDisplay as _};
                 match self {
                     #(#match_arms)*
                 }
