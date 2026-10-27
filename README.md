@@ -45,7 +45,11 @@ assert_eq!(err.trace(), "MyError::Io\n  disk full");
 - For a single unnamed-field variant (`Variant(Inner)`), the inner value is
   rendered using the first of these it implements: `Trace` (the chain
   continues), `Display`, then `Debug`. The choice is made on the concrete
-  field type, so it does not see through generic parameters.
+  field type.
+- Generic enums are supported. Every type parameter gets a `Debug` bound. A
+  field whose type is a bare parameter `E` is rendered with `Debug` unless you
+  declare `E: Trace` (or `Display`) on the enum. `#[from]` is rejected on such
+  a field, as it would conflict with the standard `impl<T> From<T> for T`.
 - `#[from]` on a single unnamed-field variant additionally generates
   `impl From<Inner> for MyError`.
 
