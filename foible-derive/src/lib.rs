@@ -2,14 +2,14 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
-#[proc_macro_derive(AsSource, attributes(from))]
-pub fn derive_as_source(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Trace, attributes(from))]
+pub fn derive_trace(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
 
     let variants = match input.data {
         Data::Enum(data) => data.variants,
-        _ => panic!("AsSource can only be derived on Enums"),
+        _ => panic!("Trace can only be derived on Enums"),
     };
 
     let mut match_arms = Vec::new();
@@ -22,8 +22,12 @@ pub fn derive_as_source(input: TokenStream) -> TokenStream {
             if fields.unnamed.len() == 1 {
                 let inner_type = &fields.unnamed[0].ty;
 
+                let label = format!("{}::{}", name, variant_ident);
                 match_arms.push(quote! {
-                    Self::#variant_ident(inner) => Some(inner),
+                    Self::#variant_ident(inner) => {
+                        out.push(#label.to_string());
+                        (&&&foible::__private::Wrap(inner)).write_chain(out);
+                    }
                 });
 
                 let has_from = variant
@@ -44,20 +48,22 @@ pub fn derive_as_source(input: TokenStream) -> TokenStream {
         }
 
         if let Fields::Unit = &variant.fields {
-            // Unit variants (like NoPendingClosures) have NO fields or parentheses
+            let label = format!("{}::{}", name, variant_ident);
             match_arms.push(quote! {
-                Self::#variant_ident => None,
+                Self::#variant_ident => out.push(#label.to_string()),
             });
         } else {
+            let label = format!("{}::{}", name, variant_ident);
             match_arms.push(quote! {
-                Self::#variant_ident { .. } => None,
+                Self::#variant_ident { .. } => out.push(#label.to_string()),
             });
         }
     }
 
     let expanded = quote! {
-        impl foible::AsSource for #name {
-            fn next_source(&self) -> Option<&dyn std::fmt::Debug> {
+        impl foible::Trace for #name {
+            fn write_trace(&self, out: &mut Vec<String>) {
+                use foible::__private::{ViaTrace as _, ViaDebug as _, ViaDisplay as _};
                 match self {
                     #(#match_arms)*
                 }

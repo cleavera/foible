@@ -1,16 +1,16 @@
 # foible
 
-Lightweight typed error chaining for Rust — `#[derive(AsSource)]` gives you a
-walkable chain of underlying errors without writing any `Display` or
-`std::error::Error` boilerplate.
+Lightweight typed error chaining for Rust — `#[derive(Trace)]` gives you a
+readable trace of the chain of underlying errors without writing any `Display`
+or `std::error::Error` boilerplate.
 
 ## Why
 
 Rust's `std::error::Error::source()` is useful, but hand-writing it (and
 `Display`, and `From` impls) for every error enum in a project is repetitive.
-`foible` derives just the chaining behaviour you need, and lets you convert to
-a standard error type at the boundary of your application (e.g. with
-`anyhow`) when you actually need one.
+`foible` derives just the chaining behaviour you need, and lets you render the
+whole chain at the boundary of your application (e.g. with `anyhow`) when you
+actually need a readable trace.
 
 ## Usage
 
@@ -18,17 +18,17 @@ Add the dependency:
 
 ```toml
 [dependencies]
-foible = "0.1"
+foible = "0.2"
 ```
 
-Derive `AsSource` on an error enum. Single-field tuple variants are treated as
-wrapped errors and are returned from `next_source()`; annotate a variant with
-`#[from]` to also get a generated `From` impl:
+Derive `Trace` on an error enum. Single-field tuple variants are treated as
+wrapped errors and are followed when building the trace; annotate a variant
+with `#[from]` to also get a generated `From` impl:
 
 ```rust
-use foible::AsSource;
+use foible::Trace;
 
-#[derive(Debug, AsSource)]
+#[derive(Debug, Trace)]
 enum MyError {
     #[from]
     Io(std::io::Error),
@@ -36,27 +36,28 @@ enum MyError {
     NotFound,
 }
 
-fn next_source(err: &MyError) -> Option<&dyn std::fmt::Debug> {
-    err.next_source()
-}
+let err = MyError::from(std::io::Error::other("disk full"));
+assert_eq!(err.trace(), "MyError::Io\n  disk full");
 ```
 
-- Unit variants (like `NotFound`) return `None` from `next_source()`.
-- Struct-style variants (`Variant { .. }`) also return `None`.
-- Single unnamed-field variants (`Variant(Inner)`) return `Some(&inner)`.
+- Each link in the chain is one line, outermost first.
+- Unit and struct-style variants (`NotFound`, `Variant { .. }`) end the chain.
+- For a single unnamed-field variant (`Variant(Inner)`), the inner value is
+  rendered using the first of these it implements: `Trace` (the chain
+  continues), `Display`, then `Debug`. The choice is made on the concrete
+  field type, so it does not see through generic parameters.
 - `#[from]` on a single unnamed-field variant additionally generates
   `impl From<Inner> for MyError`.
 
-At the boundary of your application, convert to a standard error type as
-needed, for example:
+At the boundary of your application, render the trace, for example:
 
 ```rust
-.map_err(|e| anyhow::anyhow!("{e:?}"))
+.map_err(|e| anyhow::anyhow!("{}", e.trace()))
 ```
 
 ## Crates
 
-- [`foible`](./foible) — the public `AsSource` trait and derive macro re-export.
+- [`foible`](./foible) — the public `Trace` trait and derive macro re-export.
 - [`foible-derive`](./foible-derive) — proc-macro internals for `foible`. Not
   intended to be used directly.
 
