@@ -37,7 +37,7 @@ pub fn derive_trace(input: TokenStream) -> TokenStream {
                     .any(|attr| attr.path().is_ident("from"));
                 if has_from {
                     from_impls.push(quote! {
-                        impl From<#inner_type> for #name {
+                        impl ::core::convert::From<#inner_type> for #name {
                             fn from(err: #inner_type) -> Self {
                                 Self::#variant_ident(err)
                             }
