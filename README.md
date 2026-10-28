@@ -6,11 +6,27 @@ or `std::error::Error` boilerplate.
 
 ## Why
 
-Rust's `std::error::Error::source()` is useful, but hand-writing it (and
-`Display`, and `From` impls) for every error enum in a project is repetitive.
-`foible` derives just the chaining behaviour you need, and lets you render the
-whole chain at the boundary of your application (e.g. with `anyhow`) when you
-actually need a readable trace.
+Erased error types (`Box<dyn Error>`, `anyhow`) make it easy to bubble errors
+up with `?`, but they hide what can go wrong. A caller can't tell which
+failures a function can produce, so it can't handle them exhaustively, and
+nothing tells you when a new failure mode appears.
+
+`foible` is for the typed alternative: each function returns its own error
+enum, and a lower-level error is wrapped explicitly in a variant of the
+caller's enum. The compiler then enforces the handling:
+
+- Every function boundary names its failure modes, so the signature documents
+  them.
+- A `match` on the error must cover every variant. Adding one breaks every
+  caller that needs to decide what to do with it.
+- Wrapping is explicit, so each layer chooses whether to translate, handle or
+  pass a cause up.
+
+The cost of typed errors is boilerplate and an opaque chain when you finally
+need to report one. `foible` removes both: `#[derive(Trace)]` writes the
+`From` impls for `#[from]` variants and renders the whole chain as a readable
+trace at the boundary where you log or return it, without hand-written
+`Display` or `std::error::Error` code.
 
 ## Usage
 
