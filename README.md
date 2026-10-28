@@ -18,7 +18,7 @@ Add the dependency:
 
 ```toml
 [dependencies]
-foible = "0.2"
+foible = "1.0"
 ```
 
 Derive `Trace` on an error enum. Each variant renders as one line, followed
@@ -128,7 +128,7 @@ Without either, `err.display_trace()` returns a value that implements
 without allocating:
 
 ```toml
-foible = { version = "0.2", default-features = false }
+foible = { version = "1.0", default-features = false }
 ```
 
 `#[trace(error)]` generates a `std::error::Error` impl, so it needs `std`.
