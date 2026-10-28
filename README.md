@@ -78,7 +78,7 @@ assert_eq!(err.trace(), "MyError::Io(disk full)");
 ## Boundaries and `std::error::Error`
 
 `trace()` returns the rendered `String`, so at a boundary you can log or return
-it directly. To hand an error to code that expects `std::error::Error` (`?`
+it directly (`display_trace()` does the same without allocating). To hand an error to code that expects `std::error::Error` (`?`
 into `Box<dyn Error>`, `anyhow`, `eyre`, another crate's `#[from]`), opt in
 with `#[trace(error)]`:
 
@@ -115,6 +115,23 @@ the boxed error gets your enum back.
 
 It is opt-in because it takes over `Display` for the type. Don't use it if you
 want to write your own `Display` or `Error` impl.
+
+## `no_std`
+
+`foible` is `#![no_std]`. Features:
+
+- `std` (default): implies `alloc`.
+- `alloc`: enables `trace() -> String`.
+
+Without either, `err.display_trace()` returns a value that implements
+`Display`, so you can write a trace straight into a logger or a fixed buffer
+without allocating:
+
+```toml
+foible = { version = "0.2", default-features = false }
+```
+
+`#[trace(error)]` generates a `std::error::Error` impl, so it needs `std`.
 
 ## Minimum supported Rust version
 

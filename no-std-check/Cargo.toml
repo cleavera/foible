@@ -1,0 +1,10 @@
+[package]
+name = "no-std-check"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Builds the foible derive in a #![no_std] crate to prove the generated code needs neither std nor alloc"
+
+[dependencies]
+foible = { path = "../foible", default-features = false }

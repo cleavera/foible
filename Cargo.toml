@@ -2,6 +2,7 @@
 members = [
     "foible",
     "foible-derive",
+    "no-std-check",
 ]
 resolver = "2"
 

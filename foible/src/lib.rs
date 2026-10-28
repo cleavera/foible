@@ -36,10 +36,20 @@
 //! and `std::error::Error`, for `?` into `Box<dyn Error>` and similar
 //! boundaries.
 //!
+//! The crate is `#![no_std]`. `trace()` needs the `alloc` feature (on by
+//! default); [`display_trace()`](Trace::display_trace) works without it.
+//!
 //! See the [README](https://github.com/cleavera/foible#readme) for the full
 //! rules, including generics and `#[from]`.
 
-use std::fmt::{self, Debug, Display};
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "alloc")]
+use alloc::string::{String, ToString};
+use core::fmt::{self, Debug, Display};
 
 /// A typed error that can render its chain of wrapped errors as a stack-trace
 /// style listing, one link per line, outermost first.
@@ -99,16 +109,30 @@ pub trait Trace: Debug {
     /// it wraps, if any.
     fn write_trace(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
+    /// Returns a value that writes the trace when displayed. This is the
+    /// allocation-free way to render a trace, for example straight into a
+    /// logger or a fixed buffer on a target without an allocator.
+    fn display_trace(&self) -> TraceDisplay<'_, Self> {
+        TraceDisplay(self)
+    }
+
     /// Renders the chain as a multi-line trace. Every line after the first is
     /// indented, like the frames of a stack trace.
+    ///
+    /// Requires the `alloc` feature (enabled by default through `std`).
+    #[cfg(feature = "alloc")]
     fn trace(&self) -> String {
-        struct Adapter<'a, T: ?Sized>(&'a T);
-        impl<T: Trace + ?Sized> Display for Adapter<'_, T> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.0.write_trace(f)
-            }
-        }
-        Adapter(self).to_string()
+        self.display_trace().to_string()
+    }
+}
+
+/// Displays the trace of a [`Trace`] value. Created by
+/// [`Trace::display_trace`].
+pub struct TraceDisplay<'a, T: ?Sized>(&'a T);
+
+impl<T: Trace + ?Sized> Display for TraceDisplay<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.write_trace(f)
     }
 }
 

@@ -11,6 +11,13 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[features]
+default = ["std"]
+# `alloc` enables `Trace::trace() -> String`. `std` is currently only a marker
+# for the default build; the crate itself is `no_std`.
+std = ["alloc"]
+alloc = []
+
 [dependencies]
 foible-derive = { path = "../foible-derive", version = "=0.2.0" }
 

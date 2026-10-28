@@ -26,3 +26,13 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.71
       - run: cargo check --workspace
+
+  no-std:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv6m-none-eabi
+      - run: cargo build -p no-std-check --target thumbv6m-none-eabi
+      - run: cargo build -p foible --no-default-features --features alloc --target thumbv6m-none-eabi
