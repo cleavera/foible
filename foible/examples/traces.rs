@@ -53,6 +53,18 @@ enum RetryTraced<E: Trace> {
     Exhausted(E),
 }
 
+#[derive(Debug, Trace)]
+#[trace(error)]
+enum Boundary {
+    #[from]
+    Cause(Foo),
+}
+
+fn boundary() -> Result<(), Box<dyn std::error::Error>> {
+    Err(Boundary::from(Foo::from(Bar::Wraps(Baz::C))))?;
+    Ok(())
+}
+
 fn show(title: &str, err: &impl Trace) {
     println!("# {title}\n{}\n", err.trace());
 }
@@ -102,5 +114,10 @@ fn main() {
     show(
         "generic, `E: Trace` (chain continues)",
         &RetryTraced::Exhausted(Bar::Wraps(Baz::C)),
+    );
+
+    println!(
+        "# #[trace(error)]: Display is the trace, via Box<dyn Error>\n{}",
+        boundary().unwrap_err()
     );
 }

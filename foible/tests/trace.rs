@@ -190,3 +190,59 @@ mod fields {
         assert_eq!(Foo::from(Baz::C).trace(), "Foo::NamedSingle\n  Baz::C");
     }
 }
+
+mod error_interop {
+    use foible::Trace;
+    use std::error::Error;
+
+    #[derive(Debug, Trace)]
+    enum Leaf {
+        Gone,
+    }
+
+    #[derive(Debug, Trace)]
+    #[trace(error)]
+    enum Failure {
+        #[from]
+        Cause(Leaf),
+        Data(u8),
+    }
+
+    #[derive(Debug, Trace)]
+    #[trace(error)]
+    enum Generic<E: Trace> {
+        Wrapped(E),
+    }
+
+    fn fails() -> Result<(), Box<dyn Error + Send + Sync>> {
+        Err(Failure::from(Leaf::Gone))?;
+        Ok(())
+    }
+
+    #[test]
+    fn display_is_the_trace_and_source_is_none() {
+        let e = Failure::from(Leaf::Gone);
+        assert_eq!(e.to_string(), e.trace());
+        assert_eq!(e.to_string(), "Failure::Cause\n  Leaf::Gone");
+        assert!(e.source().is_none());
+        assert_eq!(Failure::Data(1).to_string(), "Failure::Data(1)");
+    }
+
+    #[test]
+    fn boxes_and_downcasts() {
+        let err = fails().unwrap_err();
+        assert_eq!(err.to_string(), "Failure::Cause\n  Leaf::Gone");
+        assert!(matches!(
+            err.downcast_ref::<Failure>(),
+            Some(Failure::Cause(Leaf::Gone))
+        ));
+    }
+
+    #[test]
+    fn generic() {
+        assert_eq!(
+            Generic::Wrapped(Leaf::Gone).to_string(),
+            "Generic::Wrapped\n  Leaf::Gone"
+        );
+    }
+}

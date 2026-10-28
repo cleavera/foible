@@ -70,11 +70,29 @@ assert_eq!(err.trace(), "MyError::Io(disk full)");
   `E: Trace` (or `Display`) on the enum. `#[from]` is rejected on such a field,
   as it would conflict with the standard `impl<T> From<T> for T`.
 
-At the boundary of your application, render the trace, for example:
+## Boundaries and `std::error::Error`
+
+`trace()` returns the rendered `String`, so at a boundary you can log or return
+it directly. To hand an error to code that expects `std::error::Error` (`?`
+into `Box<dyn Error>`, `anyhow`, `eyre`, another crate's `#[from]`), opt in
+with `#[trace(error)]`:
 
 ```rust
-.map_err(|e| anyhow::anyhow!("{}", e.trace()))
+#[derive(Debug, Trace)]
+#[trace(error)]
+enum MyError {
+    #[from]
+    Db(DbError),
+}
 ```
+
+This generates `Display` (the full trace) and `std::error::Error` (with
+`source()` returning `None`, so tools that print `Display` and then walk
+`source()` don't repeat the chain). The type isn't erased: `downcast_ref` on
+the boxed error gets your enum back.
+
+It is opt-in because it takes over `Display` for the type. Don't use it if you
+want to write your own `Display` or `Error` impl.
 
 ## Minimum supported Rust version
 

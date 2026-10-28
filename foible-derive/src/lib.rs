@@ -6,7 +6,7 @@ use syn::{
     Type,
 };
 
-#[proc_macro_derive(Trace, attributes(from))]
+#[proc_macro_derive(Trace, attributes(from, trace))]
 pub fn derive_trace(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     expand(input)
@@ -16,6 +16,22 @@ pub fn derive_trace(input: TokenStream) -> TokenStream {
 
 fn from_attr(attrs: &[Attribute]) -> Option<&Attribute> {
     attrs.iter().find(|attr| attr.path().is_ident("from"))
+}
+
+/// Parses the container-level `#[trace(error)]` option.
+fn wants_error_impl(attrs: &[Attribute]) -> syn::Result<bool> {
+    let mut error = false;
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("trace")) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("error") {
+                error = true;
+                Ok(())
+            } else {
+                Err(meta.error("unknown option, expected `error`"))
+            }
+        })?;
+    }
+    Ok(error)
 }
 
 fn is_bare_type_param(ty: &Type, generics: &Generics) -> bool {
@@ -28,6 +44,7 @@ fn is_bare_type_param(ty: &Type, generics: &Generics) -> bool {
 }
 
 fn expand(input: DeriveInput) -> syn::Result<TokenStream2> {
+    let error_impl = wants_error_impl(&input.attrs)?;
     let name = &input.ident;
 
     let variants = match input.data {
@@ -152,6 +169,20 @@ fn expand(input: DeriveInput) -> syn::Result<TokenStream2> {
         });
     }
 
+    // `Display` is the whole trace, and `source()` stays `None`, so tools that
+    // print `Display` and then walk `source()` don't repeat the cause.
+    let error_impls = error_impl.then(|| {
+        quote! {
+            impl #trace_impl_generics ::core::fmt::Display for #name #ty_generics #trace_where_clause {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    ::foible::Trace::write_trace(self, f)
+                }
+            }
+
+            impl #trace_impl_generics ::std::error::Error for #name #ty_generics #trace_where_clause {}
+        }
+    });
+
     let expanded = quote! {
         impl #trace_impl_generics ::foible::Trace for #name #ty_generics #trace_where_clause {
             #[allow(clippy::needless_borrow, clippy::borrow_deref_ref)]
@@ -162,6 +193,8 @@ fn expand(input: DeriveInput) -> syn::Result<TokenStream2> {
                 }
             }
         }
+
+        #error_impls
 
         #(#from_impls)*
     };
