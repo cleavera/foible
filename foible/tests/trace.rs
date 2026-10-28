@@ -246,3 +246,52 @@ mod error_interop {
         );
     }
 }
+
+mod tier_priority {
+    use foible::Trace;
+    use std::fmt;
+
+    #[derive(Debug, Trace)]
+    enum Leaf {
+        Gone,
+    }
+
+    // Implements `Trace` and `Display`: `Trace` wins, so it is the cause.
+    #[derive(Debug, Trace)]
+    enum Both {
+        Gone,
+    }
+    impl fmt::Display for Both {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("display")
+        }
+    }
+
+    // Implements `Display` and `Debug`: `Display` wins.
+    #[derive(Debug)]
+    struct Shown;
+    impl fmt::Display for Shown {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("shown")
+        }
+    }
+
+    #[derive(Debug, Trace)]
+    enum Outer {
+        Trace(Both),
+        Display(Shown),
+        Debug(Option<u8>),
+        Leaf(Leaf),
+    }
+
+    #[test]
+    fn trace_then_display_then_debug() {
+        assert_eq!(
+            Outer::Trace(Both::Gone).trace(),
+            "Outer::Trace\n  Both::Gone"
+        );
+        assert_eq!(Outer::Display(Shown).trace(), "Outer::Display(shown)");
+        assert_eq!(Outer::Debug(Some(1)).trace(), "Outer::Debug(Some(1))");
+        assert_eq!(Outer::Leaf(Leaf::Gone).trace(), "Outer::Leaf\n  Leaf::Gone");
+    }
+}

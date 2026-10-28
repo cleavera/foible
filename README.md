@@ -78,12 +78,29 @@ into `Box<dyn Error>`, `anyhow`, `eyre`, another crate's `#[from]`), opt in
 with `#[trace(error)]`:
 
 ```rust
+use foible::Trace;
+use std::error::Error;
+
+#[derive(Debug, Trace)]
+enum DbError {
+    Timeout { after_ms: u32 },
+}
+
 #[derive(Debug, Trace)]
 #[trace(error)]
 enum MyError {
     #[from]
     Db(DbError),
 }
+
+fn run() -> Result<(), Box<dyn Error>> {
+    Err(MyError::from(DbError::Timeout { after_ms: 30 }))?;
+    Ok(())
+}
+
+let err = run().unwrap_err();
+assert_eq!(err.to_string(), "MyError::Db\n  DbError::Timeout(after_ms: 30)");
+assert!(err.downcast_ref::<MyError>().is_some());
 ```
 
 This generates `Display` (the full trace) and `std::error::Error` (with

@@ -22,6 +22,12 @@ pub trait Trace: Debug {
 
 pub use foible_derive::Trace;
 
+// Compiles and runs the README's examples as doctests. `cfg(doctest)` keeps
+// the path out of normal builds, so the published crate doesn't need it.
+#[cfg(doctest)]
+#[doc = include_str!("../../README.md")]
+struct ReadmeDoctests;
+
 /// Used by the derive macro. Not part of the public API.
 ///
 /// Autoref specialization: for every field, method lookup tries `Trace`, then

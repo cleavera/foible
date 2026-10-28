@@ -1,0 +1,5 @@
+error: Trace can only be derived on enums
+ --> tests/ui/on_union.rs:4:1
+  |
+4 | union NotAnEnum {
+  | ^^^^^

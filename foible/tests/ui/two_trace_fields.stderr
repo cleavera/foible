@@ -1,0 +1,14 @@
+error[E0308]: mismatched types
+  --> tests/ui/two_trace_fields.rs:10:15
+   |
+10 |     Two(Leaf, Leaf),
+   |               ^^^^
+   |               |
+   |               expected `CauseSlot`, found `CauseAlreadyTaken`
+   |               arguments to this method are incorrect
+   |
+note: method defined here
+  --> src/lib.rs
+   |
+   |         fn write_child(
+   |            ^^^^^^^^^^^

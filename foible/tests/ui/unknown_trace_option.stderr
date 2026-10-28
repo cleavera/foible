@@ -1,0 +1,5 @@
+error: unknown option, expected `error`
+ --> tests/ui/unknown_trace_option.rs:4:9
+  |
+4 | #[trace(erorr)]
+  |         ^^^^^

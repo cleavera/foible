@@ -13,3 +13,6 @@ homepage.workspace = true
 
 [dependencies]
 foible-derive = { path = "../foible-derive", version = "0.2.0" }
+
+[dev-dependencies]
+trybuild = "1.0"

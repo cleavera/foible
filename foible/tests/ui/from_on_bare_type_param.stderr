@@ -1,0 +1,5 @@
+error: #[from] cannot be used on a field whose type is a bare generic parameter
+ --> tests/ui/from_on_bare_type_param.rs:5:5
+  |
+5 |     #[from]
+  |     ^^^^^^^
