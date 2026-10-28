@@ -42,6 +42,57 @@ use std::fmt::{self, Debug, Display};
 
 /// A typed error that can render its chain of wrapped errors as a stack-trace
 /// style listing, one link per line, outermost first.
+///
+/// Prefer `#[derive(Trace)]`. Implementing the trait by hand is an escape hatch
+/// for shapes the derive doesn't cover, such as an error with several causes
+/// (the derive allows at most one `Trace` field per variant). The trait
+/// requires `Debug`, and [`write_trace`](Trace::write_trace) should follow the
+/// same conventions as the derive: write this link's line, then `"\n  "`
+/// followed by the cause's trace.
+///
+/// A hand-written type is picked up as the cause by derived enums that wrap it.
+/// The format has no way to tell siblings from nesting, so what the output
+/// looks like for several causes is up to the implementation, for example
+/// numbering them:
+///
+/// ```
+/// use std::fmt;
+/// use foible::Trace;
+///
+/// #[derive(Debug, Trace)]
+/// enum Failure {
+///     Timeout { after_ms: u32 },
+///     Refused,
+/// }
+///
+/// #[derive(Debug)]
+/// struct Many(Vec<Failure>);
+///
+/// impl Trace for Many {
+///     fn write_trace(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "Many({})", self.0.len())?;
+///         for (i, failure) in self.0.iter().enumerate() {
+///             write!(f, "\n  [{i}] ")?;
+///             failure.write_trace(f)?;
+///         }
+///         Ok(())
+///     }
+/// }
+///
+/// #[derive(Debug, Trace)]
+/// enum Request {
+///     Failed(Many),
+/// }
+///
+/// let err = Request::Failed(Many(vec![
+///     Failure::Timeout { after_ms: 30 },
+///     Failure::Refused,
+/// ]));
+/// assert_eq!(
+///     err.trace(),
+///     "Request::Failed\n  Many(2)\n  [0] Failure::Timeout(after_ms: 30)\n  [1] Failure::Refused"
+/// );
+/// ```
 pub trait Trace: Debug {
     /// Writes this link, then (indented on a new line) the trace of the error
     /// it wraps, if any.
