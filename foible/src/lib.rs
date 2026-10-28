@@ -1,3 +1,43 @@
+//! Lightweight typed error chaining.
+//!
+//! `#[derive(Trace)]` on an error enum gives it a [`trace()`](Trace::trace)
+//! that renders the chain of wrapped errors, one link per line, outermost
+//! first, with no `Display` or `std::error::Error` boilerplate and no loss of
+//! the typed enum.
+//!
+//! ```
+//! use foible::Trace;
+//!
+//! #[derive(Debug, Trace)]
+//! enum DbError {
+//!     Timeout { after_ms: u32 },
+//! }
+//!
+//! #[derive(Debug, Trace)]
+//! enum MyError {
+//!     // `#[from]` also generates `impl From<DbError> for MyError`.
+//!     #[from]
+//!     Db(DbError),
+//!     NotFound(&'static str),
+//! }
+//!
+//! let err = MyError::from(DbError::Timeout { after_ms: 30 });
+//! assert_eq!(err.trace(), "MyError::Db\n  DbError::Timeout(after_ms: 30)");
+//! assert_eq!(MyError::NotFound("users").trace(), "MyError::NotFound(users)");
+//! ```
+//!
+//! Each field is either the cause or data. A field whose type implements
+//! [`Trace`] is the cause and is rendered on the next line; at most one is
+//! allowed per variant. Every other field is data, written inline using
+//! `Display`, falling back to `Debug`.
+//!
+//! Add `#[trace(error)]` to the enum to also derive `Display` (the full trace)
+//! and `std::error::Error`, for `?` into `Box<dyn Error>` and similar
+//! boundaries.
+//!
+//! See the [README](https://github.com/cleavera/foible#readme) for the full
+//! rules, including generics and `#[from]`.
+
 use std::fmt::{self, Debug, Display};
 
 /// A typed error that can render its chain of wrapped errors as a stack-trace
