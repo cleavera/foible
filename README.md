@@ -48,7 +48,7 @@ assert_eq!(
     "MyError::Db(users)\n  DbError::Timeout(after_ms: 30)"
 );
 
-let err = MyError::from(std::io::Error::other("disk full"));
+let err = MyError::from(std::io::Error::new(std::io::ErrorKind::Other, "disk full"));
 assert_eq!(err.trace(), "MyError::Io(disk full)");
 ```
 
@@ -60,7 +60,8 @@ assert_eq!(err.trace(), "MyError::Io(disk full)");
 - A variant can have at most one `Trace` field. A second one is a compile
   error. For anything more complex, such as aggregate errors, implement
   `Trace` by hand.
-- The choice is made on the concrete field type.
+- The choice is made on the concrete field type, in the order `Trace`,
+  `Display`, `Debug`.
 - `#[from]` on a variant with exactly one field (tuple or named) additionally
   generates `impl From<Inner> for MyError`. It is a compile error on any other
   variant.
@@ -74,6 +75,10 @@ At the boundary of your application, render the trace, for example:
 ```rust
 .map_err(|e| anyhow::anyhow!("{}", e.trace()))
 ```
+
+## Minimum supported Rust version
+
+Rust 1.71.
 
 ## Crates
 

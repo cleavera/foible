@@ -20,7 +20,7 @@ struct NoDisplay;
 
 #[test]
 fn chain_through_trace_and_display() {
-    let e: Outer = Inner::from(std::io::Error::other("disk")).into();
+    let e: Outer = Inner::from(std::io::Error::new(std::io::ErrorKind::Other, "disk")).into();
     assert_eq!(e.trace(), "Outer::Inner\n  Inner::Io(disk)");
 }
 

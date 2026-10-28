@@ -111,6 +111,13 @@ fn expand(input: DeriveInput) -> syn::Result<TokenStream2> {
             }
         };
 
+        // Autoref specialization: each field is wrapped and called through
+        // `&&&`. Method lookup tries the receiver as written first, then
+        // derefs one level at a time, and takes the first trait impl whose
+        // bounds hold. The three tiers in `foible::__private` are implemented
+        // for `&&Wrap` (Trace), `&Wrap` (Display) and `Wrap` (Debug), so
+        // `&&&` makes them win in that order. Changing the number of `&`s or
+        // the tiers' `Self` types shifts the priorities.
         let write_data = fields.iter().zip(&bindings).map(|(field, binding)| {
             let field_name = match &field.ident {
                 Some(ident) => {

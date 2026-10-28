@@ -2,6 +2,8 @@
 name = "foible-derive"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+categories = ["rust-patterns", "development-tools::debugging"]
 description = "Proc-macro internals for the foible crate — do not use directly"
 keywords = ["derive", "macro", "proc-macro", "error-handling"]
 license.workspace = true
@@ -12,6 +14,6 @@ homepage.workspace = true
 proc-macro = true
 
 [dependencies]
-syn = { version = "2.0", features = ["full"] }
+syn = "2.0"
 quote = "1.0"
 proc-macro2 = "1.0"

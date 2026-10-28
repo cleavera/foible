@@ -61,7 +61,7 @@ fn main() {
     show("unit variant", &Foo::Unit);
     show(
         "wrapped non-Trace error (Display, as data)",
-        &Foo::from(std::io::Error::other("disk full")),
+        &Foo::from(std::io::Error::new(std::io::ErrorKind::Other, "disk full")),
     );
     show(
         "data only: Debug fallback",

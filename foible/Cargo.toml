@@ -2,6 +2,9 @@
 name = "foible"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+readme = "../README.md"
+categories = ["rust-patterns", "development-tools::debugging"]
 description = "Lightweight typed error chaining — #[derive(Trace)] with no Display or std::error::Error boilerplate"
 keywords = ["error", "error-handling", "derive", "macro", "source"]
 license.workspace = true
