@@ -57,6 +57,11 @@ assert_eq!(err.trace(), "MyError::Io(disk full)");
   other field is data and is written inline as `Variant(a; b)` (or
   `Variant(name: a; other: b)` for named fields), using `Display`, falling
   back to `Debug`. Variants without data have no parentheses.
+- Data is written as is. A `Display` value containing newlines (some
+  `io::Error` messages, for example) will span several lines and break the
+  one-line-per-link layout. `foible` deliberately doesn't escape or re-indent
+  it; if that matters, give the field a type whose `Display` doesn't emit
+  newlines.
 - A variant can have at most one `Trace` field. A second one is a compile
   error. For anything more complex, such as aggregate errors, implement
   `Trace` by hand.

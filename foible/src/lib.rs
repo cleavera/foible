@@ -29,7 +29,8 @@
 //! Each field is either the cause or data. A field whose type implements
 //! [`Trace`] is the cause and is rendered on the next line; at most one is
 //! allowed per variant. Every other field is data, written inline using
-//! `Display`, falling back to `Debug`.
+//! `Display`, falling back to `Debug`. Data is written as is, so a value whose
+//! `Display` contains newlines spans several lines.
 //!
 //! Add `#[trace(error)]` to the enum to also derive `Display` (the full trace)
 //! and `std::error::Error`, for `?` into `Box<dyn Error>` and similar
